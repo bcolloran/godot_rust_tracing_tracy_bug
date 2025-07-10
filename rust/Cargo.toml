@@ -6,9 +6,22 @@ edition = "2024"
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+profiling = [
+  "tracing-tracy/enable",          # actually emit data
+  "tracing-tracy/manual-lifetime", # disable the problematic static C‑tors
+  "tracing-tracy/ondemand",        # enable the on-demand feature
+]
+
 [dependencies]
 godot = "0.3.2"
 
 tracing = "0.1.41"
-tracing-tracy = "0.11.4"
+# tracing-tracy = { version = "0.11.4", features = ["enable", "manual-lifetime"] }
+tracing-tracy = { version = "0.11.4", default-features = false, features = [
+  "enable",
+  "manual-lifetime",
+  "ondemand",
+  "broadcast",       # announce presence
+] }
 tracing-subscriber = "0.3.19"
