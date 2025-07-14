@@ -1,3 +1,8 @@
+minimal recipe for setting up tracy to work with godot-rust
+
+
+# everything below is outdated as of 2025-07-14, but keeping for posterity
+<strike>
 Adding `use tracing_tracy::TracyLayer;` in you gdextension Rust code causes an error in Godot when the project is loaded or when hot reloading occurs. The error message is:
 
 ```
@@ -8,3 +13,4 @@ To reproduce:
 - Uncomment the line `use tracing_tracy::TracyLayer;` in `rust/src/lib.rs`
 - cargo build
 - the error will appear in the Godot editor console
+</strike>
