@@ -1,45 +1,54 @@
-use godot::{classes::Engine, prelude::*};
-use std::sync::{Once, OnceLock};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use tracing_tracy::{
-    TracyLayer,
-    client::{self, Client},
-};
+use godot::prelude::*;
 
+#[cfg(feature = "profiling")]
 // Single global handle; will be initialised exactly once.
-static TRACY_CLIENT: OnceLock<Client> = OnceLock::new();
+static TRACY_CLIENT: std::sync::OnceLock<tracing_tracy::client::Client> =
+    std::sync::OnceLock::new();
 
 struct MyExtension;
 
 #[gdextension]
 unsafe impl ExtensionLibrary for MyExtension {
-    fn on_level_init(level: InitLevel) {
-        if level == InitLevel::Scene && !Engine::singleton().is_editor_hint() {
-            godot_print!("MyExtension::on_level_init, with tracing enabled");
-            // Make sure we only run the init block once per library load.
-            static START: Once = Once::new();
-            START.call_once(|| {
-                // 1. Start Tracy manually (manual‑lifetime feature enabled).
-                let client = Client::start();
-                let _ = TRACY_CLIENT.set(client);
+    fn on_level_init(_level: InitLevel) {
+        // can twiddle this string to make sure the library is hot reloaded
+        godot_print!("MyExtension::on_level_init - [edit 3]");
+        #[cfg(feature = "profiling")]
+        {
+            use std::sync::Once;
+            use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+            use tracing_tracy::{TracyLayer, client::Client};
 
-                // 2. Install the Tracy layer for all `tracing` spans.
-                let _ = tracing_subscriber::registry()
-                    .with(TracyLayer::default())
-                    .try_init(); // avoids panics if already set
-            });
+            if _level == InitLevel::Scene && !godot::classes::Engine::singleton().is_editor_hint() {
+                godot_print!("MyExtension::on_level_init, with tracing enabled");
+                // Make sure we only run the init block once per library load.
+                static START: Once = Once::new();
+                START.call_once(|| {
+                    // 1. Start Tracy manually (manual‑lifetime feature enabled).
+                    let client = Client::start();
+                    let _ = TRACY_CLIENT.set(client);
+
+                    // 2. Install the Tracy layer for all `tracing` spans.
+                    let _ = tracing_subscriber::registry()
+                        .with(TracyLayer::default())
+                        .try_init(); // avoids panics if already set
+                });
+            }
         }
     }
 
-    fn on_level_deinit(level: InitLevel) {
-        godot_print!("MyExtension::on_level_deinit, with tracing enabled");
-        if level == InitLevel::Scene && !Engine::singleton().is_editor_hint() {
-            // Explicitly shut Tracy down; required with `manual-lifetime`.
-            unsafe {
-                client::sys::___tracy_shutdown_profiler();
+    fn on_level_deinit(_level: InitLevel) {
+        godot_print!("MyExtension::on_level_deinit");
+        #[cfg(feature = "profiling")]
+        {
+            if _level == InitLevel::Scene && !godot::classes::Engine::singleton().is_editor_hint() {
+                godot_print!("MyExtension::on_level_deinit, with tracing enabled");
+                // Explicitly shut Tracy down; required with `manual-lifetime`.
+                unsafe {
+                    tracing_tracy::client::sys::___tracy_shutdown_profiler();
+                }
+                // TRACY_CLIENT stays filled, but the library is about to be unloaded,
+                // so its memory will disappear immediately afterwards.
             }
-            // TRACY_CLIENT stays filled, but the library is about to be unloaded,
-            // so its memory will disappear immediately afterwards.
         }
     }
 }
@@ -63,7 +72,12 @@ impl INode for Tester {
     }
 
     fn physics_process(&mut self, _delta: f64) {
-        godot_print!("Tester::process, process_tick: {}", self.process_tick);
+        // can twiddle this string to make sure the library is hot reloaded,
+        // and that updated custom node methods are called correctly
+        godot_print!(
+            "Tester::process, process_tick [edit 3]: {}",
+            self.process_tick
+        );
         self.process_tick += 1;
         let a = fib(10);
         let b = next_prime(10000);
@@ -85,6 +99,9 @@ fn next_prime(n: u32) -> u32 {
     while !is_prime(candidate) {
         candidate += 1;
     }
+    // can twiddle this string to make sure the library is hot reloaded,
+    // and that updated rust fns called correctly
+    godot_print!("next_prime({}) = {}; [edit 3]", n, candidate);
     candidate
 }
 
